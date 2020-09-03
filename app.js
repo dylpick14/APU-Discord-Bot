@@ -33,8 +33,16 @@ const roleIDs = {
     juniors: '744939312596123788',
     sophomores:'744939352295211148',
     freshman:'744939409425825923',
-    fifthyear:'744939006021599325',
+    student:'744939006021599325',
     facultyStaff:'745699273425027072',
+    accounting: '744940822914400358',
+    alliedHealth: '744940824940511254',
+    animationVisualEffects: '744940826169311393',
+    appliedMath: '744940827200979014',
+    art: '744940827599700049',
+    biblicalStudies: '744940827910078606',
+    biochemistry: '744940828744613969',
+    Biology: '744940828744613969',
 }
 // Config properties
 const CONFIG = {
@@ -53,40 +61,42 @@ const CONFIG = {
 
 
 async function fetchProfile(userID) {
-    
-    fetch('https://home.apu.edu/apu/api/profile/newToken.php', {
+    let urlencoded = new URLSearchParams();
+    urlencoded.append("user_id", userID);
+    return fetch('https://home.apu.edu/apu/api/profile/newToken.php', {
          method: 'POST',
-          body: `user_id=${userID}` 
+          body: urlencoded 
     })
         .then((res) => res.json())
         .then((json) => {
             const token = json.data.token;
-            fetch('https://home.apu.edu/apu/api/profile/profileAPIv2.php', {
+            let urlencoded = new URLSearchParams();
+            urlencoded.append("token", token);
+            return fetch('https://home.apu.edu/apu/api/profile/profileAPIv2.php', {
                 method: 'POST',
-                body: `token=${token}` 
+                body: urlencoded 
             })
             .then((res) => res.json())
             .then((json) => {
-                console.log(json);
+                return json;
             })
         });
         
         
 }
-    
+
 
 
 
 /*************
  * Functions *
  *************/
-const testStudents = ["kjnakamura"];
+const testStudents = ["kjnakamura", "dattridge16"];
 const emailSuffix = "@apu.edu";
 const emailedStudents = [];
-const tokensGenerated = [];
-const usedTokens = [];
-const verify = false;
+let tokens = {}
 let inviteLinks = [];
+
 const numStudents = testStudents.length;
 
 async function sendInvites(message){
@@ -104,21 +114,31 @@ async function sendInvites(message){
             },
         )
         inviteCode = "https://discord.gg/" + invite.code;
-        //console.log(inviteCode);
         inviteLinks.push({
             netID: netID,
             invite: inviteCode
         });
         
-        token = generateToken(min, max);
-        //console.log(token);
-        tokensGenerated.push(token.toString());
-        //console.log(studentEmail);
+        token = generateToken(min, max).toString();
+        tokens[token] = {
+            used:false,
+            netid: netID
+        }
         const mailOptions = {
             from: 'dattridge20@gmail.com',
             to: studentEmail,
             subject: 'Invite to Azusa Pacific University\'s Community Discord server!',
-            text: 'Welcome back! We have created a virtual place for students to be integrated to while in a remote learning environment! Please use this link to join the Discord server.\n' + inviteCode + '\nOnce joined you will need to put in your access token so that the server knows you are part of the APU community. Here is your token: ' + token
+            html: `<h1>Welcome back to APU!</h1>
+            <p style="color:#000000">We have created a virtual place for students to be integrated to while in a remote learning environment!<br>
+            Please use this link to join the Discord server.<br><br>
+            <b>Your Invite Link:<br><br>
+            ${inviteCode} </b><br><br>
+            After you have joined, you will need to put in your access token so that we can verify that you belong to the APU community.<br><br>
+            <b>Your Access Code: </b><br><br>
+            <b style="color:#990000; font-size:2em">${token}</b><br><br>
+            Please do not share this invite link or access code with anyone else. You may only use the code once, and no one else should use the link or code that belongs to you.<br><br>
+            
+            <i>Problems? Please contact the Support Desk to get a new invite link: <a href= "mailto:support@apu.edu">support@apu.edu</a></i></p>`
         };
         transporter.sendMail(mailOptions, function(error, info){
                 if (error){
@@ -131,9 +151,7 @@ async function sendInvites(message){
         //testStudents.splice(netID);
         
     }
-    for (let i = 0; i < tokensGenerated.length; i++){
-        console.log(tokensGenerated[i]);
-    }
+   
 }
 /**
  *  Handle a command from a Discord user.
@@ -154,56 +172,68 @@ async function handleCommand(msg, cmd, args) {
             break;
         case "verify":
             //verifies
+            
             let token = args[0];
-            const index = tokensGenerated.indexOf(token);
-            if (tokensGenerated.includes(token)){
-                member.send("The token: " + args.join(" ") + " was accepted!");
-                fetchProfile("").then((profile) => {
-                    console.log(profile);
-                });
-                // member.send("Next please use the command !myinfo followed by your first name, last name, and your academic year (freshman, sophomore, junior, seniors, 5th year). Ex: !myinfo Freddie Cougar Sophomore. If you are faculty/staff please do !myinfo Freddie Cougar faculty/staff.");
-                // verify = true;
-                // usedTokens.push(token);  
-                // tokensGenerated.splice(index, 1);
-            } else if (usedTokens.includes(token)){
-                member.send("The token: " + args.join(" ") + " has already been used. Please use the support text channel to request a new token. We appoligize for the inconvenience.");
-            }else {
-                member.send("The token: " + args.join(" ") + " is invalid. Please double check your email and try again. If the issue persists and you belive this to be incorrect, please put a message into the support text channel and a moderator will help you shortly.")
-            }
-            break;
-        case "myinfo":
-            let name = args[0] + " " + args[1];
-            let year = args[2];
-            year = year.toLowerCase();
-            let roleID = '';
-            if (channel.type === "dm"){
-                if (year.includes("5th year")){
-                    roleID = roleIDs.fifthyear;
-                }else if (year.includes("senior")){
-                    roleID = roleIDs.seniors;
-                } else if(year.includes("junior")){
-                    roleID = roleIDs.juniors;
-                } else if(year.includes("sophomore")){
-                    roleID = roleIDs.sophomores;
-                } else if(year.includes("freshman")){
-                    roleID = roleIDs.freshman;
-                } else if(year.includes("faculty/staff")){
-                    roleID = roleIDs.facultyStaff;
+            if (tokens[token]){
+                if (tokens[token].used){
+                    member.send("The token: " + token + " has already been used. Please use the support text channel to request a new token. We appoligize for the inconvenience.");
                 } else{
-                    member.send("Im sorry something was not correct, please try the !myinfo command again.")
+                    member.send("The token: " + token + " was accepted!");
+                    tokens[token].used = true;
+                    fetchProfile(tokens[token].netid).then(async (profile) => {
+                        var name = profile.personal.name;
+                        var persona = profile.personas;
+                        let programs = profile.academics.programs[0];
+                        let memberObj = await Guild.MemberManager.fetch(member.id)
+                        let nickname = await memberObj.setNickname(name);
+                        member.send("Welcome Your name on the server has been set to: " + name);
+                        if (channel.type === "dm"){
+                            console.log(persona);
+                            if (persona.includes("STU") || persona.includes("GP")){
+                                roleID = roleIDs.student;
+                                member.send("You have been assigned the Student role. You now have access to the server! Enjoy!");
+                            }else{
+                                roleID = roleIDs.facultyStaff;
+                                member.send("You have been assigned the Faculty/Staff role. Please use the !setName command followed by your first and last name. EX: !setName Freddie Cougar");
+                            } 
+                            let role = await Guild.RoleManager.fetch(roleID)
+                            memberObj.roles.add(role);
+
+                            Guild.RoleManager.fetch().then(async (roles) => {
+                                for (let role of roles.cache) {
+                                    role = role[1]
+                                    const { name, id } = role;
+                                    // if(programs.includes(name)){
+                                    //     memberObj.roles.add(id);
+                                    // }
+                                    for (let program in programs){
+                                        if (program.includes(name)){
+                                            memberObj.roles.add(id);
+                                        }
+                                    }
+                                        
+                                }
+                            })
+                            //let role = Guild.RolesManager.find(r => r.name === "Major: Computer Science");
+                            //console.log(role);
+                        }
+
+                    });
                 }
-                let role = await Guild.RoleManager.fetch(roleID)
-                let memberObj = await Guild.MemberManager.fetch(member.id)
-                let nickname = await memberObj.setNickname(name);
-                //console.log(memberObj);
-                memberObj.roles.add(role);
-                //memberObj.setNickname(firstName + " " + lastName);
-                console.log(nickname);
-                member.send("Your name on the server has been set to: " + name);
-                member.send("You have been assigned the " + role + ". You now have access to the server! Enjoy!");
+            }else {
+                member.send("The token: " + token + " is invalid. Please double check your email and try again. If the issue persists and you belive this to be incorrect, please put a message into the support text channel and a moderator will help you shortly.")
             }
             break;
-        case "invite":
+        
+        case "setName":
+            var name = args[0] + " " + args[1];
+            var roleID = roleIDs.facultyStaff;
+            let memberObj = await Guild.MemberManager.fetch(member.id)
+            let memberRoles = memberObj.roles.member._roles
+            if (memberRoles.includes(roleID)){
+                await memberObj.setNickname(name);
+            }
+            
             
             break;
         default:
