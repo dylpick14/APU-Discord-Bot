@@ -47,15 +47,16 @@ const roleIDs = {
 async function fetchProfile(userID) {
     let urlencoded = new URLSearchParams();
     urlencoded.append('user_id', userID);
+
     return fetch('https://home.apu.edu/apu/api/profile/newToken.php', {
         method: 'POST',
         body: urlencoded,
     })
         .then(res => res.json())
         .then(json => {
-            const token = json.data.token;
             let urlencoded = new URLSearchParams();
-            urlencoded.append('token', token);
+            urlencoded.append('token', json.data.token);
+
             return fetch('https://home.apu.edu/apu/api/profile/profileAPIv2.php', {
                 method: 'POST',
                 body: urlencoded,
@@ -67,7 +68,7 @@ async function fetchProfile(userID) {
         });
 }
 
-const testStudents = [
+const _ = [
     'dattridge16',
     // 'dcordova',
     'cbunayog17',
@@ -155,9 +156,8 @@ const suicideTriggers = [
  *
  *  @note - Discord messages which are treated as commands are expected to look like: "!commandName arg1 arg2 arg3".
  */
-async function handleCommand(msg, cmd, args) {
-    const channel = msg.channel;
-    const member = msg.member;
+function handleCommand(msg, cmd, args) {
+    const { channel, author } = msg;
 
     switch (cmd.toLowerCase()) {
         case 'test':
@@ -165,11 +165,11 @@ async function handleCommand(msg, cmd, args) {
             break;
         case 'verify':
             // Verify the user based on the token received by email
-            verifyUser(member, args[0], channel);
+            verifyUser(author, args[0], channel);
             break;
         case 'setname':
             // Set nickname for faculty and staff members
-            handleSetName(member, args, channel);
+            handleSetName(author, args, channel);
             break;
         default:
             msg.reply(`I'm sorry, '!${cmd}' is not a command.`);
@@ -177,22 +177,20 @@ async function handleCommand(msg, cmd, args) {
     }
 }
 
-// Generate a random 6 digit number
-function generateToken({ min, max }) {
-    const randNum = Math.floor(Math.random() * (max - min + 1) + min);
-    return randNum.toString();
-}
-
 async function verifyUser(member, token, channel) {
+    let foundMatchingToken = false;
+
     // For every user in the `tokens` object
     for (let netid of Object.keys(tokens)) {
         // Check if the user matches the token that was used in !verify command
-        if (tokens[netid].token) {
+        if (tokens[netid].token === token) {
+            foundMatchingToken = true;
+
             // Check if that token has been used
             if (tokens[netid].used) {
                 member.send(
-                    `The token '${token}' has already been used. 
-                    Please use the support text channel to request a new token. 
+                    `The token '${token}' has already been used. \
+                    Please use the support text channel to request a new token. \
                     We appoligize for the inconvenience.`
                 );
                 return;
@@ -202,18 +200,18 @@ async function verifyUser(member, token, channel) {
             tokens[netid].used = true;
             saveObjectToFile(tokens, './tokens.json');
 
-            // Fetches the users information from the home API
-            // Assigns their nickname to be their name pulled from the home API
-            // Assigns a users role based on their persona in the home API
+            // Fetch the user's information from the home API
             fetchProfile(netid).then(async profile => {
-                const { personal, personas, academics } = profile;
+                // Assign their nickname to be their name pulled from the home API
+                // Assign a users role based on their persona in the home API
+                const { personal, personas, academics } = profile,
+                    { name } = personal,
+                    programs = academics.programs[0];
 
-                const { name } = personal
-                const programs = academics.programs[0];
+                const memberObj = await Guild.MemberManager.fetch(member.id);
+                memberObj.setNickname(name);
 
-                let memberObj = await Guild.MemberManager.fetch(member.id);
                 member.send(`Welcome! Your name on the server has been set to: ${name}`);
-                await memberObj.setNickname(name);
 
                 if (channel.type === 'dm') {
                     let newRoles = [];
@@ -222,7 +220,9 @@ async function verifyUser(member, token, channel) {
                     if (personas.includes('STAFF')) {
                         newRoles.push(roleIDs.facultyStaff);
                         member.send(
-                            'You have been assigned the Faculty/Staff role. Please use the !setName command followed by your first and last name. EX: !setName Freddie Cougar'
+                            `You have been assigned the Faculty/Staff role. \
+                            Please use the !setName command followed by your first and last name.\n \
+                            Example: !setName Freddie Cougar`
                         );
                     }
 
@@ -234,27 +234,19 @@ async function verifyUser(member, token, channel) {
                                 newRoles.push(roleIDs.undergraduate);
                             if (programs.includes('Career: Graduate'))
                                 newRoles.push(roleIDs.graduate);
-                                
+
                             // Check for any other roles that match the user's list of programs
                             for (let i in programs) {
                                 for (let role of roles.cache) {
                                     const { name, id } = role[1];
-
-                                    if (programs[i].includes(name)) {
-                                        newRoles.push(id);
-                                        console.log(`${netid} has a new role: ${name}`);
-                                    }
+                                    if (programs[i].includes(name)) newRoles.push(id);
                                 }
                             }
                         })
-                        .then(() => {
-                            // Assign all of the roles pushed to the list above
+                        .finally(() => {
+                            // Assign all of the roles that were pushed to the list above
                             for (let i in newRoles) {
-                                console.log('Adding role: ' + newRoles[i]);
                                 Guild.RoleManager.fetch(newRoles[i]).then(role => {
-                                    //console.log(role);
-                                    const { name, id } = role;
-                                    console.log(`Trying to add role: ${name} with ID ${id}...`);
                                     memberObj.roles.add(role);
                                 });
                             }
@@ -265,13 +257,15 @@ async function verifyUser(member, token, channel) {
             // Exit this function so that we stop searching for a matching token in the `tokens` object
             return;
         }
+    }
 
-        member.send(
-            `The token: ${token} is invalid. 
-            Please double check your email and try again. 
-            If the issue persists and you belive this to be incorrect, 
-            please put a message into the #support text channel and a moderator will help you shortly.`
-        );
+    if (!foundMatchingToken) {
+        // Token was not found in tokens.json
+        member.send(`
+        The token '${token}' is invalid. \
+        Please double check your email and try again.\n \
+        If the issue persists and you believe this to be incorrect, \
+        please put a message into the #support text channel and a moderator will help you shortly.`);
     }
 }
 
@@ -279,7 +273,7 @@ async function handleSetName(member, args, channel) {
     const [first, last] = args,
         memberObj = await Guild.MemberManager.fetch(member.id),
         memberRoles = memberObj.roles.member._roles;
-   
+
     if (channel.type === 'dm' && first && last) {
         const name = `${first} ${last}`;
 
@@ -288,7 +282,8 @@ async function handleSetName(member, args, channel) {
             member.send(`Your nick name has been changed to ${name}`);
         }
     } else {
-        member.send(`Please give a first and last name. Example: !setName Freddie Cougar`)
+        member.send(`Please give a first and last name.\n \
+        Example: !setName Freddie Cougar`);
     }
 }
 
@@ -301,12 +296,11 @@ async function sendInvites(message) {
 
         // For each line in file
         for (let i in lines) {
-            const [emplid, netid] = lines[i].split(',');
-            if (emplid && netid) {
+            const [netid] = lines[i].split(',');
+            if (netid) {
                 // Check if user already has received a token
                 if (tokens[netid] && tokens[netid].token) {
                     // This user already has received a token
-                    console.log(`User ${netid} already got a token.`);
                 } else {
                     sendEmailWithNewToken(message, netid);
                 }
@@ -369,12 +363,7 @@ function saveObjectToFile(obj, file) {
     const json = JSON.stringify(obj);
 
     fs.writeFile(file, json, err => {
-        if (err) {
-            console.error('Error writing file', err);
-            return;
-        }
-
-        console.log(`Successfully wrote to ${file}`);
+        if (err) console.error('Error writing file', err);
     });
 }
 
@@ -385,22 +374,16 @@ function saveObjectToFile(obj, file) {
  */
 function logMessageWithColors(msg) {
     const d = new Date(msg.createdTimestamp),
-        h = d.getHours(),
-        m = d.getMinutes(),
-        s = d.getSeconds(),
-        time = colors.grey(`[${h}:${m}:${s}]`),
-        author = colors.cyan(`@${msg.author.username}`);
+        time = colors.grey(`[${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}]`),
+        user = colors.cyan(`@${msg.author.username}`);
 
-    console.log(`${time} ${author}: ${msg.content}`);
+    console.log(`${time} ${user}: ${msg.content}`);
 }
 
 function sendEmailWithOptions(mailOptions) {
     transporter.sendMail(mailOptions, function (err) {
-        if (err) {
-            console.error(err);
-            return;
-        }
-        console.log(`Email sent to: ${mailOptions.to}`);
+        if (err) console.error(err);
+        else console.log(`Email sent to: ${mailOptions.to}`);
     });
 }
 
@@ -418,6 +401,7 @@ function watchForSuicideMessages(msg) {
             t.replace("don't", 'dont'),
             t.replace("don't", 'do not'),
         ];
+
         for (let j = 0; j < variants.length; j++) {
             if (msg.content.toLowerCase().includes(variants[j])) {
                 msg.reply('Get help: 1-800-273-8255');
@@ -434,6 +418,14 @@ function watchForSuicideMessages(msg) {
             }
         }
     }
+}
+
+/**
+ *  Generate a random 6 digit number
+ */
+function generateToken({ min, max }) {
+    const randNum = Math.floor(Math.random() * (max - min + 1) + min);
+    return randNum.toString();
 }
 
 /**************************
@@ -494,7 +486,8 @@ client.on('message', msg => {
 client.on('guildMemberAdd', member => {
     member.send('Welcome to the server!').then(() => {
         member.send(
-            'Please use the command !verify alongside the 6-digit numerical token sent in your invitation email. Ex: "!verify 012345'
+            `Please use the command !verify alongside the 6-digit numerical token sent in your invitation email.\n \
+            Example: "!verify 012345`
         );
     });
 });
