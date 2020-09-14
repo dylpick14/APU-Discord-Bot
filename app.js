@@ -68,35 +68,6 @@ async function fetchProfile(userID) {
         });
 }
 
-const _ = [
-    'dattridge16',
-    // 'dcordova',
-    'cbunayog17',
-    'kjnakamura',
-    //'cgaonagalvan17',
-    //'srouggly',
-    //'reroberts'
-    //'alexoh',
-    // 'bbillar', in
-    //'cratliff',
-    //'mbrowning',
-    //'rpierre',
-    // 'rdavis', in
-    //'alawson',
-    // 'bgroom16', in
-    //'rfang20',
-    // 'cisozaki', in
-    // 'cspilman18', in
-    //'cchick18', in
-    //'jaughtmon18', in
-    //'amcox16',
-    //'coyoung19',
-    //'asetrakian19',
-    // 'awood', in
-    // 'aroberts', in
-    // 'froberts' in
-];
-
 let tokens = {};
 
 let Guild;
@@ -189,9 +160,9 @@ async function verifyUser(member, token, channel) {
             // Check if that token has been used
             if (tokens[netid].used) {
                 member.send(
-                    `The token '${token}' has already been used. \
-                    Please use the support text channel to request a new token. \
-                    We appoligize for the inconvenience.`
+                    `The token '${token}' has already been used. ` +
+                        `Please use the support text channel to request a new token. ` +
+                        `We appoligize for the inconvenience.`
                 );
                 return;
             }
@@ -220,9 +191,9 @@ async function verifyUser(member, token, channel) {
                     if (personas.includes('STAFF')) {
                         newRoles.push(roleIDs.facultyStaff);
                         member.send(
-                            `You have been assigned the Faculty/Staff role. \
-                            Please use the !setName command followed by your first and last name.\n \
-                            Example: !setName Freddie Cougar`
+                            `You have been assigned the Faculty/Staff role. ` +
+                                `Please use the !setName command followed by your first and last name.\n` +
+                                `Example: !setName Freddie Cougar`
                         );
                     }
 
@@ -261,11 +232,12 @@ async function verifyUser(member, token, channel) {
 
     if (!foundMatchingToken) {
         // Token was not found in tokens.json
-        member.send(`
-        The token '${token}' is invalid. \
-        Please double check your email and try again.\n \
-        If the issue persists and you believe this to be incorrect, \
-        please put a message into the #support text channel and a moderator will help you shortly.`);
+        member.send(
+            `The token '${token}' is invalid. ` +
+                `Please double check your email and try again.\n` +
+                `If the issue persists and you believe this to be incorrect, ` +
+                `please put a message into the #support text channel and a moderator will help you shortly.`
+        );
     }
 }
 
@@ -282,8 +254,7 @@ async function handleSetName(member, args, channel) {
             member.send(`Your nick name has been changed to ${name}`);
         }
     } else {
-        member.send(`Please give a first and last name.\n \
-        Example: !setName Freddie Cougar`);
+        member.send(`Please give a first and last name.\nExample: !setName Freddie Cougar`);
     }
 }
 
@@ -332,8 +303,7 @@ async function sendEmailWithNewToken(message, netid) {
         };
         saveObjectToFile(tokens, './tokens.json');
 
-        const body = `<p>By request of Brittany Billar, you have been selected to be test users to APU's New Community Discord.</p><br>
-            <h1>Welcome back to APU!</h1>
+        const body = `<h1>Welcome back to APU!</h1>
             <p style="color:#000000">We have created a virtual place for students to be integrated to while in a remote learning environment!<br>
             Please use this link to join the Discord server.<br><br>
             <b>Your Invite Link:<br><br>
@@ -344,7 +314,7 @@ async function sendEmailWithNewToken(message, netid) {
             <b style="color:#990000; font-size:2em">${token}</b><br><br>
             Please do not share this invite link or access code with anyone else. You may only use the code once, and no one else should use the link or code that belongs to you.<br><br>
             
-            <i>Problems? Please respond back to this email and we will be sure to assist you</p>`;
+            <i>Problems? Please let the moderators know your issue in the support channel on discord. If you can't get to the support text channel on discord, please respond to this email and we will assist you.</p>`;
 
         const mailOptions = {
             from: 'APUDiscordBot@gmail.com',
@@ -387,7 +357,10 @@ function sendEmailWithOptions(mailOptions) {
     });
 }
 
-function watchForSuicideMessages(msg) {
+async function watchForSuicideMessages(msg) {
+    var member = msg.author;
+    var memberObj = await Guild.MemberManager.fetch(member.id)
+    var name = memberObj.nickname;
     for (let i = 0; i < suicideTriggers.length; i++) {
         let t = suicideTriggers[i].toLowerCase();
         const variants = [
@@ -404,14 +377,14 @@ function watchForSuicideMessages(msg) {
 
         for (let j = 0; j < variants.length; j++) {
             if (msg.content.toLowerCase().includes(variants[j])) {
-                msg.reply('Get help: 1-800-273-8255');
+                msg.reply(`Need help? The national suicide hotline is: 1-800-273-8255.\nIf you are experiencing emotional distress please call 626-815-2109 for 24/7 urgent care services.\n In emergency situations, call 911 first and then contact the Department of Campus Safety at (626) 815-3898.`);
 
                 // This will be used to email someone at APU of the student who said one of the trigger words to reach out to them
                 var mailOptions = {
                     from: 'APUDiscordBot@gmail.com',
-                    to: 'insert email here',
-                    subject: 'Suicide watch alert',
-                    html: `<p>This is a test to see if it will send an email if this functions right</p>`,
+                    to: 'bbillar@apu.edu',
+                    subject: 'Discord suicide prevention alert for ' + name,
+                    html: `<p>${name} said: "${msg}" on the APU Discord Server. Can someone reach out to him/her to make sure they are okay.</p>`,
                 };
                 sendEmailWithOptions(mailOptions);
                 break;
@@ -477,6 +450,9 @@ client.on('message', msg => {
     if (msg.content === 'ping') {
         msg.reply('pong');
     }
+    if (msg.content === 'pong') {
+        msg.reply('ping');
+    }
 
     // Check if the message contains suicidal thoughts
     watchForSuicideMessages(msg);
@@ -486,8 +462,9 @@ client.on('message', msg => {
 client.on('guildMemberAdd', member => {
     member.send('Welcome to the server!').then(() => {
         member.send(
-            `Please use the command !verify alongside the 6-digit numerical token sent in your invitation email.\n \
-            Example: "!verify 012345`
+            `Please use the command !verify alongside the ` +
+                `6-digit numerical token from your invitation email.\n ` +
+                `Example: "!verify 012345"`
         );
     });
 });

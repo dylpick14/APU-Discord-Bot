@@ -1,4 +1,4 @@
-# Discord Node Chat Bot Template
+# Discord Node Bot for APU Community Server
 
 A simple Discord bot made with Node.js
 
