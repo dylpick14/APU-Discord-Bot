@@ -33,7 +33,7 @@ const CONFIG = {
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: 'APUDiscordBot@gmail.com',
+        user: 'apudiscordbot@apu.edu',
         pass: process.env.EPASS,
     },
 });
@@ -252,6 +252,8 @@ async function handleSetName(member, args, channel) {
         if (memberRoles.includes(roleIDs.facultyStaff)) {
             memberObj.setNickname(name);
             member.send(`Your nick name has been changed to ${name}`);
+        }else{
+            member.send("Only Faculty staff have access to this command");
         }
     } else {
         member.send(`Please give a first and last name.\nExample: !setName Freddie Cougar`);
@@ -317,7 +319,7 @@ async function sendEmailWithNewToken(message, netid) {
             <i>Problems? Please let the moderators know your issue in the support channel on discord. If you can't get to the support text channel on discord, please respond to this email and we will assist you.</p>`;
 
         const mailOptions = {
-            from: 'APUDiscordBot@gmail.com',
+            from: 'apudiscordbot@apu.edu',
             to: studentEmail,
             subject: "Invite to Azusa Pacific University's Community Discord server!",
             html: body,
@@ -381,7 +383,7 @@ async function watchForSuicideMessages(msg) {
 
                 // This will be used to email someone at APU of the student who said one of the trigger words to reach out to them
                 var mailOptions = {
-                    from: 'APUDiscordBot@gmail.com',
+                    from: 'apudiscordbot@apu.edu',
                     to: 'bbillar@apu.edu',
                     subject: 'Discord suicide prevention alert for ' + name,
                     html: `<p>${name} said: "${msg}" on the APU Discord Server. Can someone reach out to him/her to make sure they are okay.</p>`,
